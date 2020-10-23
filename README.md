@@ -5,8 +5,8 @@ Source: https://mode.com/sql-tutorial/sql-window-functions/
 
 Uses of window functions:
 - Rolling averages, counts, sums 
-- ranks,dense ranks, percentiles of each group/sub-group
-- 
+- Ranks,dense ranks, percentiles of each group/sub-group
+- Difference between current row and preceding/following row
 
 Syntax example: To calculate running total duration for each terminal
 ```
@@ -89,3 +89,59 @@ WINDOW grouped_window AS
          (PARTITION BY start_terminal ORDER BY duration_seconds)
  ORDER BY start_terminal, duration_seconds
  ```
+
+ ---
+
+## Pivot table 
+
+Alternative to **CROSSTAB**
+
+Sample question: Create a pivot table with counts of 'good', 'bad', 'ok' occurrences [link](https://www.codewars.com/kata/5982020284a83baf2f00001c/train/sql)
+```
+SELECT p.name AS name,
+       COUNT(CASE WHEN d.detail = 'good' THEN 1 END) AS good,
+       COUNT(CASE WHEN d.detail = 'ok' THEN 1 END) AS ok,
+       COUNT(CASE WHEN d.detail = 'bad' THEN 1 END) AS bad
+FROM products p 
+  INNER JOIN details d ON p.id = d.product_id
+GROUP BY p.name
+ORDER BY p.name;
+```
+
+## Lateral joins
+
+Source: https://medium.com/kkempin/postgresqls-lateral-join-bfd6bd0199df 
+
+For example, we have the following table `orders`.
+
+Table "public.orders"
+   Column   |            Type             | Modifiers
+------------+-----------------------------+-----------
+ id         | integer                     | not null
+ user_id    | integer                     |
+ created_at | timestamp without time zone |
+
+Running the following code:
+```
+SELECT user_id, first_order_time, next_order_time, id FROM
+  (SELECT user_id, min(created_at) AS first_order_time FROM orders GROUP BY user_id) o1
+  LEFT JOIN LATERAL
+  (SELECT id, created_at AS next_order_time
+   FROM orders
+   WHERE user_id = o1.user_id AND created_at > o1.first_order_time
+   ORDER BY created_at ASC LIMIT 1)
+   o2 ON true;
+```
+The result is:
+
+ user_id |      first_order_time      |      next_order_time       | id
+---------+----------------------------+----------------------------+----
+       1 | 2017-06-20 04:35:03.582895 | 2017-06-20 04:58:10.137503 |  4
+       3 | 2017-06-20 04:35:10.986712 | 2017-06-20 04:58:17.905277 |  5
+       2 | 2017-06-20 04:35:07.564973 |                   
+
+We use `LEFT JOIN LATERAL` which means we iterate over each of the element from o1 and we are executing subquery.
+In the subquery we are selecting ID and time of the next order for each user. We can do this by using a condition created_at > o1.first_order_time which will use first_order_time from the first query (LATERAL join gives us that opportunity).
+
+LATERAL allows us to iterate over each of the results (record) and run subquery giving an access to that record.
+
