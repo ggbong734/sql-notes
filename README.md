@@ -145,3 +145,35 @@ In the subquery we are selecting ID and time of the next order for each user. We
 
 LATERAL allows us to iterate over each of the results (record) and run subquery giving an access to that record.
 
+Example question: https://www.codewars.com/kata/5820176255c3d23f360000a9/train/sql
+
+## Interview questions
+
+Given two tables. One an attendance log for every student in a school district and the other a summary table with demographics for each student in the district.
+
+attendance_events : date | student_id | attendance
+all_students : student_id | school_id | grade_level | date_of_birth | hometown
+
+Using this data, could you answer questions like the following:
+- What percent of students attend school on their birthday?
+- Which grade level had the largest drop in attendance between yesterday and today?
+
+
+2nd question:
+```
+SELECT date, grade, today, yesterday, today - yesterday diff
+FROM 
+    (SELECT a.date, s.grade, COUNT(a.attendance) today, 
+            LAG(COUNT(a.attendance), 1) OVER (PARTITION BY grade ORDER BY date) yesterday
+     FROM attendance a JOIN students s ON a.student_id = s.student_id     
+     WHERE a.attendance = 'present' 
+       AND a.date >= (CURRENT_DATE - INTERVAL '1 day')::date    
+     GROUP BY a.date, s.grade) last_days 
+WHERE date = CURRENT_DATE 
+ORDER BY diff ASC 
+LIMIT 1;
+```
+
+Explanation: The subquery will compute the attendance for each grade for the last two days. In addition, it uses the LAG window function to include the attendance of the same grade for the preceding day (partitions by grade and orders by date).
+
+The outer query will select the rows for the current date and compute the difference between today's and yesterday's attendance. To find the grade with the largest drop, we order by the computed difference and use LIMIT 1 to only return the row with the largest drop (or smallest increase if there is no drop for any class).
